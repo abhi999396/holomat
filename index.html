@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>HoloMat Remote Controller</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+</head>
+<body style="background: #141428; color: white; text-align: center; font-family: sans-serif; padding: 20px;">
+    <h1>HoloMat Remote</h1>
+    <p id="status">Connecting...</p>
+    <button onclick="sendRequest()" style="padding: 15px 30px; font-size: 18px; border-radius: 10px; cursor: pointer;">Request Control</button>
+    <br><br>
+    <video id="webcam" style="width: 80%; border: 2px solid #555; border-radius: 10px;"></video>
+
+    <script>
+        // Use your specific Cloudflare Link here
+        const socket = new WebSocket('wss://condos-metro-humanitarian-radius.trycloudflare.com');
+
+        socket.onopen = () => { document.getElementById('status').innerText = "Connected! Wave your hand."; };
+        socket.onclose = () => { document.getElementById('status').innerText = "Disconnected from Bridge."; };
+
+        const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+        hands.setOptions({ maxNumHands: 1, minDetectionConfidence: 0.7 });
+
+        hands.onResults((results) => {
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const indexFinger = results.multiHandLandmarks[0][8];
+                // Send coordinates to your laptop
+                socket.send(JSON.stringify({
+                    type: "input",
+                    x: indexFinger.x,
+                    y: indexFinger.y,
+                    click: false
+                }));
+            }
+        });
+
+        const camera = new Camera(document.getElementById('webcam'), {
+            onFrame: async () => { await hands.send({image: document.getElementById('webcam')}); },
+            width: 640, height: 480
+        });
+        camera.start();
+
+        function sendRequest() {
+            socket.send(JSON.stringify({ type: "request" }));
+            alert("Request sent to Host!");
+        }
+    </script>
+</body>
+</html>
